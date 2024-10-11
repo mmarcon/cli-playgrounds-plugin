@@ -15,45 +15,36 @@
 package main
 
 import (
+	"atlas-cli-plugin/internal/cli/playgrounds"
 	"fmt"
 	"os"
-
-	"atlas-cli-plugin/internal/cli/echo"
-	"atlas-cli-plugin/internal/cli/hello"
-	"atlas-cli-plugin/internal/cli/printenv"
-	"atlas-cli-plugin/internal/cli/sharedlibrary"
-	"atlas-cli-plugin/internal/cli/stdinreader"
 
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	exampleCmd := &cobra.Command{
-		Use:   "example",
-		Short: "Root command of the atlas cli plugin example",
+	playgroundsCmd := &cobra.Command{
+		Use:   "playgrounds",
+		Short: "MongoDB Atlas Playgrounds",
 	}
 
-	exampleCmd.AddCommand(
-		hello.Builder(),
-		echo.Builder(),
-		printenv.Builder(),
-		stdinreader.Builder(),
-		sharedlibrary.Builder(),
+	playgroundsCmd.AddCommand(
+		playgrounds.ImportCmdBuilder(),
 	)
 
 	completionOption := &cobra.CompletionOptions{
-		DisableDefaultCmd: true,
-		DisableNoDescFlag: true,
+		DisableDefaultCmd:   true,
+		DisableNoDescFlag:   true,
 		DisableDescriptions: true,
-		HiddenDefaultCmd: true,
+		HiddenDefaultCmd:    true,
 	}
 	rootCmd := &cobra.Command{
 		DisableFlagParsing: true,
-		DisableAutoGenTag: true,
+		DisableAutoGenTag:  true,
 		DisableSuggestions: true,
-		CompletionOptions: *completionOption,
+		CompletionOptions:  *completionOption,
 	}
-	rootCmd.AddCommand(exampleCmd)
+	rootCmd.AddCommand(playgroundsCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

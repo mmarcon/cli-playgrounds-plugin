@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-project_name: atlas-cli-plugin-example
+project_name: atlas-cli-plugin-playgrounds
 
 version: 2
 
 builds:
   - 
-    id: "atlas-cli-plugin-example"
+    id: "atlas-cli-plugin-playgrounds"
     main: ./cmd/plugin/main.go
     binary: ./binary
 
