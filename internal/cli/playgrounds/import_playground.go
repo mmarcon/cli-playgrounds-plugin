@@ -118,6 +118,22 @@ func toCamelCase(s string) string {
 	return strings.Join(words, "")
 }
 
+func toKebabCase(s string) string {
+	// Split the string into words
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+
+	// Convert the first word to lowercase
+	if len(words) == 0 {
+		return ""
+	}
+	words[0] = strings.ToLower(words[0])
+
+	// Join the words back together with a hyphen
+	return strings.Join(words, "-")
+}
+
 func ImportCmdBuilder() *cobra.Command {
 	importCmd := &cobra.Command{
 		Use:   "import",
@@ -161,10 +177,11 @@ func ImportCmdBuilder() *cobra.Command {
 			// if the user provided a URL, extract the snapshot ID
 			// the URL should be in the format: https://search-playground.mongodb.com/api/tools/code-playground/snapshots/<snapshot_id>
 			parsedURL, err := url.Parse(urlOrSnapshotID)
+			var playground *Playground
 			if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 				// Not a URL, assume it's a snapshot ID
 				snapshotID := urlOrSnapshotID
-				playground, err := fetchPlayground(snapshotID)
+				playground, err = fetchPlayground(snapshotID)
 				if err != nil {
 					return err
 				}
@@ -173,16 +190,19 @@ func ImportCmdBuilder() *cobra.Command {
 				// It's a URL, extract the snapshot ID
 				pathSegments := strings.Split(parsedURL.Path, "/")
 				snapshotID := pathSegments[len(pathSegments)-1]
-				playground, err := fetchPlayground(snapshotID)
+				playground, err = fetchPlayground(snapshotID)
 				if err != nil {
-					return err
-				}
-				fmt.Printf("Fetched playground: %+v\n", playground)
-				if err := storeDataIntoMongoDB(connectionString, "playground", toCamelCase(playground.Name), playground.SearchConfig.Documents); err != nil {
 					return err
 				}
 			}
 
+			if err := storeDataIntoMongoDB(connectionString, "playground", toCamelCase(playground.Name), playground.SearchConfig.Documents); err != nil {
+				return err
+			}
+
+			utils.CreateProjectDir(toKebabCase(playground.Name))
+			utils.StoreSearchIndexDefinition(toKebabCase(playground.Name), playground.SearchConfig.IndexDefinition, "playground", toCamelCase(playground.Name))
+			utils.StoreScript(toKebabCase(playground.Name), playground.SearchConfig.AggregationPipeline, "playground", toCamelCase(playground.Name))
 			return nil
 		},
 	}
