@@ -15,8 +15,8 @@
 package main
 
 import (
-	"atlas-cli-plugin/internal/cli/playgrounds"
 	"fmt"
+	"mmarcon/cli-playgrounds-plugin/internal/cli/playgrounds"
 	"os"
 
 	"github.com/spf13/cobra"

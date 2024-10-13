@@ -1,64 +1,82 @@
 package utils
 
 import (
-	"bytes"
+	"embed"
+	"encoding/json"
+	"log"
 	"os"
-	"text/template"
+	"path/filepath"
+	"strings"
+
+	"github.com/leaanthony/debme"
+	"github.com/leaanthony/gosod"
 )
 
-const searchIndexTemplate = `{
-  "name": "{{.IndexName}}",
-  "database": "{{.DatabaseName}}",
-  "collectionName": "{{.CollectionName}}",
-  "definition": {{.IndexDefinition}}
-}`
+//go:embed project_template/*
+var projectTemplate embed.FS
 
-const scriptTemplate = `
-use("{{.DatabaseName}}");
-db.{{.CollectionName}}.aggregate({{.AggregationPipeline}}).toArray();
-`
-
-// create a brand new directory for the project
-func CreateProjectDir(projectDir string) error {
-	return os.Mkdir(projectDir, 0755)
+type config struct {
+	IndexName           string
+	Mappings            string
+	DatabaseName        string
+	CollectionName      string
+	AggregationPipeline string
 }
 
-func StoreSearchIndexDefinition(projectDir string, indexDefinition string, databaseName string, collectionName string) error {
-	// Set default value for indexName if not provided
-	idxName := "default"
-
-	tmpl, err := template.New("searchIndex").Parse(searchIndexTemplate)
-	if err != nil {
-		return err
+func GenerateProject(projectDir string, mappings string, databaseName string, collectionName string, aggregationPipeline string) {
+	root, _ := debme.FS(projectTemplate, "project_template")
+	project := gosod.New(root)
+	projectConfig := &config{
+		IndexName:           "default",
+		Mappings:            mappings,
+		DatabaseName:        databaseName,
+		CollectionName:      collectionName,
+		AggregationPipeline: aggregationPipeline,
 	}
 
-	var result bytes.Buffer
-	err = tmpl.Execute(&result, map[string]string{
-		"IndexName":       idxName,
-		"DatabaseName":    databaseName,
-		"CollectionName":  collectionName,
-		"IndexDefinition": indexDefinition,
-	})
+	err := project.Extract(projectDir, projectConfig)
+
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-	return os.WriteFile(projectDir+"/search-index.json", result.Bytes(), 0644)
+
+	err = walkAndFormat(projectDir)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-func StoreScript(projectDir string, aggregationPipeline string, databaseName string, collectionName string) error {
-	tmpl, err := template.New("script").Parse(scriptTemplate)
+func reformatFile(path string) error {
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	var result bytes.Buffer
-	err = tmpl.Execute(&result, map[string]string{
-		"DatabaseName":        databaseName,
-		"CollectionName":      collectionName,
-		"AggregationPipeline": aggregationPipeline,
-	})
-	if err != nil {
-		return err
+	var formattedContent string
+	if strings.HasSuffix(path, ".json") {
+		var obj map[string]interface{}
+		json.Unmarshal(content, &obj)
+		formattedBytes, _ := json.MarshalIndent(obj, "", "  ")
+		formattedContent = string(formattedBytes)
 	}
-	return os.WriteFile(projectDir+"/playground.mongodb.js", result.Bytes(), 0644)
+
+	//TODO: Add support for files other than JSON
+
+	return os.WriteFile(path, []byte(formattedContent), 0644)
+}
+
+func walkAndFormat(rootDirectory string) error {
+	return filepath.Walk(rootDirectory, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && (strings.HasSuffix(path, ".json")) {
+			log.Printf("Formatting file: %s\n", path)
+			if err := reformatFile(path); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

@@ -1,0 +1,6 @@
+{
+  "name": "{{.IndexName}}",
+  "database": "{{.DatabaseName}}",
+  "collectionName": "{{.CollectionName}}",
+  "mappings": {{.Mappings}}
+}

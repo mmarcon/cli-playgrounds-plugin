@@ -1,13 +1,13 @@
 package playgrounds
 
 import (
-	"atlas-cli-plugin/internal/utils"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"mmarcon/cli-playgrounds-plugin/internal/utils"
 	"net/http"
 	"net/url"
 	"os"
@@ -88,6 +88,7 @@ func storeDataIntoMongoDB(connectionString string, databaseName string, collecti
 
 	// Insert the BSON array into MongoDB
 	collection := client.Database(databaseName).Collection(collectionName)
+	collection.Drop(ctx)
 	_, err = collection.InsertMany(ctx, bsonArray)
 
 	if err != nil {
@@ -185,7 +186,7 @@ func ImportCmdBuilder() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Fetched playground: %+v\n", playground)
+				log.Printf("Fetched playground: %+v\n", playground)
 			} else {
 				// It's a URL, extract the snapshot ID
 				pathSegments := strings.Split(parsedURL.Path, "/")
@@ -200,9 +201,19 @@ func ImportCmdBuilder() *cobra.Command {
 				return err
 			}
 
-			utils.CreateProjectDir(toKebabCase(playground.Name))
-			utils.StoreSearchIndexDefinition(toKebabCase(playground.Name), playground.SearchConfig.IndexDefinition, "playground", toCamelCase(playground.Name))
-			utils.StoreScript(toKebabCase(playground.Name), playground.SearchConfig.AggregationPipeline, "playground", toCamelCase(playground.Name))
+			var anyJson map[string]interface{}
+			if err := json.Unmarshal([]byte(playground.SearchConfig.IndexDefinition), &anyJson); err != nil {
+				return fmt.Errorf("failed to unmarshal index definition: %w", err)
+			}
+			mappings, _ := json.Marshal(anyJson["mappings"])
+			utils.GenerateProject(
+				toKebabCase(playground.Name),
+				string(mappings),
+				"playground",
+				toCamelCase(playground.Name),
+				playground.SearchConfig.AggregationPipeline,
+			)
+
 			return nil
 		},
 	}
